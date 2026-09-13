@@ -2,10 +2,390 @@
 <html lang="my">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0,
+                   maximum-scale=1.0, user-scalable=no">
+
+    <meta name="theme-color" content="#071827">
+    <meta name="mobile-web-app-capable" content="yes">
+
     <title>Kilo Oway</title>
+
+    <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
-    Kilo Oway
+
+<div class="app">
+
+    <!-- HEADER -->
+    <header class="topbar">
+
+        <div class="brand">
+
+            <div class="app-icon">
+                🚕
+            </div>
+
+            <div>
+                <div class="brand-name">Kilo Oway</div>
+                <div class="brand-sub">Myanmar Oway Kilometer Meter</div>
+            </div>
+
+        </div>
+
+        <div class="header-actions">
+
+            <button class="icon-btn" id="historyBtn" aria-label="History">
+                ◷
+            </button>
+
+            <button class="icon-btn" id="settingsBtn" aria-label="Settings">
+                ⚙
+            </button>
+
+        </div>
+
+    </header>
+
+
+    <!-- MAIN FARE CARD -->
+    <section class="fare-card">
+
+        <div class="city-glow"></div>
+
+        <div class="fare-content">
+
+            <div class="small-title">
+                စုစုပေါင်းကျသင့်ငွေ
+            </div>
+
+            <div class="fare-row">
+
+                <span id="totalFare">3,000</span>
+
+                <span class="currency">Ks</span>
+
+            </div>
+
+            <div class="fare-detail">
+                အခြေခံ <span id="baseFareText">3,000</span> Ks
+                • KM <span id="perKmText">1,000</span> Ks
+                • စောင့်ဆိုင်း <span id="perMinuteText">150</span> Ks
+            </div>
+
+        </div>
+
+        <div class="tuktuk-watermark">
+            🚕
+        </div>
+
+    </section>
+
+
+    <!-- STAT GRID -->
+    <section class="stats-grid">
+
+        <div class="stat-card">
+
+            <div class="stat-icon">📍</div>
+
+            <div class="stat-label">
+                စုစုပေါင်းကီလို
+            </div>
+
+            <div class="stat-value">
+                <span id="distance">0.00</span>
+                <span class="unit">km</span>
+            </div>
+
+        </div>
+
+
+        <div class="stat-card">
+
+            <div class="stat-icon">◷</div>
+
+            <div class="stat-label">
+                စုစုပေါင်းကြာချိန်
+            </div>
+
+            <div class="stat-value time">
+                <span id="duration">00:00:00</span>
+            </div>
+
+        </div>
+
+
+        <div class="stat-card waiting-card">
+
+            <div class="stat-icon">⏱</div>
+
+            <div class="stat-label">
+                စောင့်ဆိုင်းချိန်
+            </div>
+
+            <div class="stat-value time">
+                <span id="waitingTime">00:00:00</span>
+            </div>
+
+        </div>
+
+
+        <div class="stat-card">
+
+            <div class="stat-icon">⚡</div>
+
+            <div class="stat-label">
+                လက်ရှိမြန်နှုန်း
+            </div>
+
+            <div class="stat-value">
+
+                <span id="speed">0.0</span>
+
+                <span class="unit">km/h</span>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- GPS STATUS -->
+    <section class="gps-card">
+
+        <div class="gps-left">
+
+            <div id="gpsDot" class="gps-dot"></div>
+
+            <div>
+
+                <div id="gpsStatus" class="gps-title">
+                    GPS စောင့်နေသည်
+                </div>
+
+                <div id="gpsAccuracy" class="gps-sub">
+                    Location permission လိုအပ်ပါသည်
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="signal-bars">
+
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+
+        </div>
+
+    </section>
+
+
+    <!-- WAITING -->
+    <section class="waiting-control">
+
+        <div class="waiting-info">
+
+            <div class="waiting-circle">
+                ⏱
+            </div>
+
+            <div>
+
+                <div class="waiting-title">
+                    စောင့်ဆိုင်းရန်
+                </div>
+
+                <div id="waitingStatusText" class="waiting-sub">
+                    ခလုတ်နှိပ်၍ စတင်နိုင်ပါသည်
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <button id="waitingBtn" class="waiting-btn">
+
+            <span id="waitingBtnIcon">○</span>
+
+            <span id="waitingBtnText">
+                စောင့်ဆိုင်းရန်
+            </span>
+
+        </button>
+
+    </section>
+
+
+    <!-- WARNING -->
+    <div id="warningBox" class="warning-box hidden">
+
+        <div class="warning-icon">!</div>
+
+        <div id="warningText">
+            GPS အချက်အလက် မရရှိသေးပါ။
+        </div>
+
+        <button id="closeWarning">
+            ×
+        </button>
+
+    </div>
+
+
+    <!-- START / STOP -->
+    <button id="mainBtn" class="main-btn">
+
+        <span id="mainBtnIcon">▶</span>
+
+        <span id="mainBtnText">
+            စတင်
+        </span>
+
+    </button>
+
+
+    <div class="version">
+        Kilo Oway • Version 1.0
+    </div>
+
+
+    <!-- BOTTOM NAV -->
+    <nav class="bottom-nav">
+
+        <button class="nav-btn active" id="homeNav">
+            <span>⌂</span>
+            <small>မီတာ</small>
+        </button>
+
+        <button class="nav-btn" id="historyNav">
+            <span>◷</span>
+            <small>မှတ်တမ်း</small>
+        </button>
+
+        <button class="nav-btn" id="settingsNav">
+            <span>⚙</span>
+            <small>ဆက်တင်</small>
+        </button>
+
+    </nav>
+
+</div>
+
+
+<!-- HISTORY MODAL -->
+<div id="historyModal" class="modal hidden">
+
+    <div class="modal-panel">
+
+        <div class="modal-header">
+
+            <div>
+                <div class="modal-title">
+                    ခရီးမှတ်တမ်း
+                </div>
+
+                <div class="modal-sub">
+                    သိမ်းထားသော ခရီးစဉ်များ
+                </div>
+            </div>
+
+            <button id="closeHistory" class="modal-close">
+                ×
+            </button>
+
+        </div>
+
+        <div id="historyList" class="history-list"></div>
+
+    </div>
+
+</div>
+
+
+<!-- SETTINGS MODAL -->
+<div id="settingsModal" class="modal hidden">
+
+    <div class="modal-panel">
+
+        <div class="modal-header">
+
+            <div>
+                <div class="modal-title">
+                    ဆက်တင်
+                </div>
+
+                <div class="modal-sub">
+                    ဈေးနှုန်းများကို စိတ်ကြိုက်သတ်မှတ်ပါ
+                </div>
+            </div>
+
+            <button id="closeSettings" class="modal-close">
+                ×
+            </button>
+
+        </div>
+
+
+        <label class="input-label">
+            အခြေခံဈေးနှုန်း (Ks)
+        </label>
+
+        <input
+            id="baseFareInput"
+            class="price-input"
+            type="number"
+            min="0"
+            step="1"
+        >
+
+
+        <label class="input-label">
+            1 Kilometer ဈေးနှုန်း (Ks)
+        </label>
+
+        <input
+            id="perKmInput"
+            class="price-input"
+            type="number"
+            min="0"
+            step="1"
+        >
+
+
+        <label class="input-label">
+            စောင့်ဆိုင်း 1 မိနစ်ဈေးနှုန်း (Ks)
+        </label>
+
+        <input
+            id="perMinuteInput"
+            class="price-input"
+            type="number"
+            min="0"
+            step="1"
+        >
+
+
+        <button id="saveSettings" class="save-btn">
+            သိမ်းမည်
+        </button>
+
+        <button id="resetSettings" class="reset-btn">
+            မူလဈေးနှုန်းပြန်ထားမည်
+        </button>
+
+    </div>
+
+</div>
+
+
+<script src="app.js"></script>
+
 </body>
 </html>
