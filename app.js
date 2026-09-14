@@ -1,12 +1,12 @@
 /* =====================================================
    KILO OWAY
    Version 1.0
-   Myanmar Oway Kilometer Meter
+   Part 1/3
    ===================================================== */
 
 
 /* =========================
-   SETTINGS
+   DEFAULT SETTINGS
    ========================= */
 
 const DEFAULT_SETTINGS = {
@@ -15,9 +15,50 @@ const DEFAULT_SETTINGS = {
     perMinute: 150
 };
 
-let settings =
-    JSON.parse(localStorage.getItem("kiloOwaySettings"))
-    || DEFAULT_SETTINGS;
+
+/* =========================
+   SETTINGS
+   ========================= */
+
+let settings = loadSavedSettings();
+
+function loadSavedSettings() {
+
+    try {
+
+        const saved =
+            localStorage.getItem("kiloOwaySettings");
+
+        if (!saved) {
+            return { ...DEFAULT_SETTINGS };
+        }
+
+        const data = JSON.parse(saved);
+
+        return {
+            baseFare:
+                Number(data.baseFare) >= 0
+                    ? Number(data.baseFare)
+                    : DEFAULT_SETTINGS.baseFare,
+
+            perKm:
+                Number(data.perKm) >= 0
+                    ? Number(data.perKm)
+                    : DEFAULT_SETTINGS.perKm,
+
+            perMinute:
+                Number(data.perMinute) >= 0
+                    ? Number(data.perMinute)
+                    : DEFAULT_SETTINGS.perMinute
+        };
+
+    } catch (error) {
+
+        console.log("Settings error:", error);
+
+        return { ...DEFAULT_SETTINGS };
+    }
+}
 
 
 /* =========================
@@ -25,7 +66,6 @@ let settings =
    ========================= */
 
 let isRunning = false;
-
 let isWaiting = false;
 
 let watchId = null;
@@ -37,25 +77,29 @@ let totalDistance = 0;
 let startTime = 0;
 
 let waitingStartTime = 0;
-
 let totalWaitingMs = 0;
 
 let timerId = null;
 
 let lastGpsTime = 0;
 
+let currentSpeed = 0;
+
 let audioContext = null;
 
 let warningTimer = null;
 
-let currentSpeed = 0;
-
 
 /* =========================
-   DOM
+   DOM HELPER
    ========================= */
 
 const $ = id => document.getElementById(id);
+
+
+/* =========================
+   DOM ELEMENTS
+   ========================= */
 
 const totalFareEl = $("totalFare");
 
@@ -99,52 +143,64 @@ const historyList = $("historyList");
 
 
 /* =========================
-   FORMAT
+   FORMAT MONEY
    ========================= */
 
 function formatMoney(value) {
 
-    return Math.round(value)
+    return Math.round(Number(value) || 0)
         .toLocaleString("en-US");
 }
 
 
+/* =========================
+   FORMAT TIME
+   ========================= */
+
 function formatTime(ms) {
 
-    let totalSeconds =
-        Math.max(0, Math.floor(ms / 1000));
+    let seconds =
+        Math.max(
+            0,
+            Math.floor((Number(ms) || 0) / 1000)
+        );
 
     const hours =
-        Math.floor(totalSeconds / 3600);
+        Math.floor(seconds / 3600);
 
-    totalSeconds %= 3600;
+    seconds %= 3600;
 
     const minutes =
-        Math.floor(totalSeconds / 60);
+        Math.floor(seconds / 60);
 
-    const seconds =
-        totalSeconds % 60;
+    seconds %= 60;
 
     return (
         String(hours).padStart(2, "0")
-        + ":" +
-        String(minutes).padStart(2, "0")
-        + ":" +
-        String(seconds).padStart(2, "0")
+        + ":"
+        + String(minutes).padStart(2, "0")
+        + ":"
+        + String(seconds).padStart(2, "0")
     );
 }
 
 
 /* =========================
-   HAVERSINE DISTANCE
+   DISTANCE
    ========================= */
 
-function calculateDistance(lat1, lon1, lat2, lon2) {
+function calculateDistance(
+    lat1,
+    lon1,
+    lat2,
+    lon2
+) {
 
     const R = 6371000;
 
     const toRad =
-        degrees => degrees * Math.PI / 180;
+        value =>
+            value * Math.PI / 180;
 
     const dLat =
         toRad(lat2 - lat1);
@@ -162,7 +218,8 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
         Math.sin(dLon / 2) ** 2;
 
     const c =
-        2 * Math.atan2(
+        2 *
+        Math.atan2(
             Math.sqrt(a),
             Math.sqrt(1 - a)
         );
@@ -172,7 +229,7 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 
 
 /* =========================
-   FARE CALCULATION
+   WAITING TIME
    ========================= */
 
 function getCurrentWaitingMs() {
@@ -181,10 +238,18 @@ function getCurrentWaitingMs() {
         return totalWaitingMs;
     }
 
-    return totalWaitingMs
-        + (Date.now() - waitingStartTime);
+    return (
+        totalWaitingMs
+        +
+        Date.now() -
+        waitingStartTime
+    );
 }
 
+
+/* =========================
+   FARE
+   ========================= */
 
 function calculateFare() {
 
@@ -192,71 +257,104 @@ function calculateFare() {
         getCurrentWaitingMs();
 
     const distanceFare =
-        totalDistance
-        * settings.perKm;
-
-    const waitingMinutes =
-        waitingMs / 60000;
+        totalDistance *
+        settings.perKm;
 
     const waitingFare =
-        waitingMinutes
-        * settings.perMinute;
-
-    const fare =
-        settings.baseFare
-        + distanceFare
-        + waitingFare;
+        (waitingMs / 60000) *
+        settings.perMinute;
 
     return Math.max(
         settings.baseFare,
-        fare
+        settings.baseFare
+        +
+        distanceFare
+        +
+        waitingFare
     );
 }
 
 
 /* =========================
-   UI UPDATE
+   UPDATE UI
    ========================= */
 
 function updateUI() {
 
+    if (!distanceEl) {
+        return;
+    }
+
+
     distanceEl.textContent =
         totalDistance.toFixed(2);
+
 
     speedEl.textContent =
         currentSpeed.toFixed(1);
 
+
     totalFareEl.textContent =
-        formatMoney(calculateFare());
-
-    $("baseFareText").textContent =
-        formatMoney(settings.baseFare);
-
-    $("perKmText").textContent =
-        formatMoney(settings.perKm);
-
-    $("perMinuteText").textContent =
-        formatMoney(settings.perMinute);
+        formatMoney(
+            calculateFare()
+        );
 
 
-    if (isRunning) {
+    const baseFareText =
+        $("baseFareText");
+
+    const perKmText =
+        $("perKmText");
+
+    const perMinuteText =
+        $("perMinuteText");
+
+
+    if (baseFareText) {
+
+        baseFareText.textContent =
+            formatMoney(
+                settings.baseFare
+            );
+    }
+
+
+    if (perKmText) {
+
+        perKmText.textContent =
+            formatMoney(
+                settings.perKm
+            );
+    }
+
+
+    if (perMinuteText) {
+
+        perMinuteText.textContent =
+            formatMoney(
+                settings.perMinute
+            );
+    }
+
+
+    if (startTime > 0) {
 
         durationEl.textContent =
-            formatTime(Date.now() - startTime);
+            formatTime(
+                Date.now() - startTime
+            );
 
     } else {
 
         durationEl.textContent =
-            startTime
-                ? formatTime(
-                    Date.now() - startTime
-                )
-                : "00:00:00";
+            "00:00:00";
     }
 
 
     waitingTimeEl.textContent =
-        formatTime(getCurrentWaitingMs());
+        formatTime(
+            getCurrentWaitingMs()
+        );
 }
 
 
@@ -264,40 +362,72 @@ function updateUI() {
    GPS STATUS
    ========================= */
 
-function setGpsStatus(status, text, sub) {
+function setGpsStatus(
+    status,
+    title,
+    sub
+) {
 
-    gpsStatusEl.textContent = text;
+    if (!gpsStatusEl) {
+        return;
+    }
 
-    gpsAccuracyEl.textContent = sub;
+
+    gpsStatusEl.textContent =
+        title;
+
+
+    gpsAccuracyEl.textContent =
+        sub;
+
 
     gpsDotEl.classList.remove(
         "connected",
         "error"
     );
 
-    const bars =
-        document.querySelector(".signal-bars");
 
-    bars.classList.remove("good");
+    const bars =
+        document.querySelector(
+            ".signal-bars"
+        );
+
+
+    if (bars) {
+
+        bars.classList.remove(
+            "good"
+        );
+    }
 
 
     if (status === "connected") {
 
-        gpsDotEl.classList.add("connected");
+        gpsDotEl.classList.add(
+            "connected"
+        );
 
-        bars.classList.add("good");
 
+        if (bars) {
+
+            bars.classList.add(
+                "good"
+            );
+        }
     }
+
 
     if (status === "error") {
 
-        gpsDotEl.classList.add("error");
+        gpsDotEl.classList.add(
+            "error"
+        );
     }
 }
 
 
 /* =========================
-   GPS START
+   START GPS
    ========================= */
 
 function startGPS() {
@@ -307,32 +437,52 @@ function startGPS() {
         setGpsStatus(
             "error",
             "GPS မထောက်ပံ့ပါ",
-            "ဒီဖုန်း Browser/WebView တွင် GPS မရနိုင်ပါ"
+            "ဒီ Browser / WebView တွင် GPS မရနိုင်ပါ"
         );
 
-        return;
+        return false;
     }
 
 
     setGpsStatus(
         "waiting",
         "GPS ရှာနေသည်...",
-        "Satellite / Location အချက်အလက် စောင့်နေပါသည်"
+        "Location အချက်အလက် စောင့်နေပါသည်"
     );
 
 
-    watchId =
-        navigator.geolocation.watchPosition(
-            handlePosition,
-            handleGpsError,
-            {
-                enableHighAccuracy: true,
+    try {
 
-                maximumAge: 1000,
+        watchId =
+            navigator.geolocation.watchPosition(
+                handlePosition,
+                handleGpsError,
+                {
+                    enableHighAccuracy: true,
+                    maximumAge: 1000,
+                    timeout: 15000
+                }
+            );
 
-                timeout: 10000
-            }
+        return true;
+
+    } catch (error) {
+
+        console.log(
+            "GPS start error:",
+            error
         );
+
+
+        setGpsStatus(
+            "error",
+            "GPS မစတင်နိုင်ပါ",
+            "Location service ကို စစ်ဆေးပါ"
+        );
+
+
+        return false;
+    }
 }
 
 
@@ -342,19 +492,22 @@ function startGPS() {
 
 function handlePosition(position) {
 
-    const now = Date.now();
+    const now =
+        Date.now();
 
-    lastGpsTime = now;
+    lastGpsTime =
+        now;
 
 
     const coords =
         position.coords;
 
+
     const lat =
-        coords.latitude;
+        Number(coords.latitude);
 
     const lon =
-        coords.longitude;
+        Number(coords.longitude);
 
     const accuracy =
         Number(coords.accuracy) || 999;
@@ -363,26 +516,36 @@ function handlePosition(position) {
     setGpsStatus(
         "connected",
         "GPS ချိတ်ဆက်ထားသည်",
-        "Accuracy ±" +
-        Math.round(accuracy) +
+        "Accuracy ±"
+        +
+        Math.round(accuracy)
+        +
         " m"
     );
 
 
-    if (accuracy > 80) {
+    /* GPS accuracy warning */
+
+    if (
+        isRunning
+        &&
+        accuracy > 80
+    ) {
 
         showWarning(
-            "GPS တိကျမှုနည်းနေပါသည်။ လမ်းပေါ်တွင် မောင်းနေချိန် Location တည်ငြိမ်အောင် ခဏစောင့်ပါ။"
+            "GPS တိကျမှုနည်းနေပါသည်။ Location တည်ငြိမ်အောင် ခဏစောင့်ပါ။"
         );
     }
 
 
+    /* Trip မစသေးရင် reference point သိမ်း */
+
     if (!isRunning) {
 
         lastPosition = {
-            lat,
-            lon,
-            accuracy,
+            lat: lat,
+            lon: lon,
+            accuracy: accuracy,
             time: now
         };
 
@@ -390,110 +553,132 @@ function handlePosition(position) {
     }
 
 
-    if (lastPosition) {
+    /* ပထမဆုံး GPS point */
 
-        const meters =
-            calculateDistance(
-                lastPosition.lat,
-                lastPosition.lon,
-                lat,
-                lon
-            );
-
-
-        /*
-         * GPS noise ကနေ distance မတက်အောင်
-         * Accuracy နဲ့ movement ကို စစ်ပါ။
-         */
-
-        const timeDiff =
-            now - lastPosition.time;
-
-
-        const speedFromPoints =
-            timeDiff > 0
-                ? meters / (timeDiff / 1000)
-                : 0;
-
-
-        /*
-         * GPS jump ဖြစ်ပြီး
-         * အလွန်ဝေးတဲ့ point တစ်ခု ရုတ်တရက်
-         * ရောက်လာရင် မထည့်ပါ။
-         */
-
-        const unrealisticJump =
-            meters > 300
-            &&
-            speedFromPoints > 55;
-
-
-        const tinyGpsNoise =
-            meters < Math.max(
-                4,
-                accuracy * 0.35
-            );
-
-
-        if (
-            !unrealisticJump
-            &&
-            !tinyGpsNoise
-        ) {
-
-            totalDistance +=
-                meters / 1000;
-        }
-
-
-        /*
-         * Speed
-         */
-
-        if (
-            typeof coords.speed === "number"
-            &&
-            coords.speed >= 0
-        ) {
-
-            currentSpeed =
-                coords.speed * 3.6;
-
-        } else {
-
-            if (
-                !unrealisticJump
-                &&
-                timeDiff > 0
-            ) {
-
-                currentSpeed =
-                    Math.min(
-                        150,
-                        speedFromPoints * 3.6
-                    );
-
-            } else {
-
-                currentSpeed = 0;
-            }
-        }
-
-
-        /*
-         * မောင်းနေချိန် GPS point
-         * ကို update လုပ်ပါ။
-         */
+    if (!lastPosition) {
 
         lastPosition = {
-            lat,
-            lon,
-            accuracy,
+            lat: lat,
+            lon: lon,
+            accuracy: accuracy,
             time: now
         };
 
         updateUI();
+
+        return;
     }
+
+
+    const meters =
+        calculateDistance(
+            lastPosition.lat,
+            lastPosition.lon,
+            lat,
+            lon
+        );
+
+
+    const timeDiff =
+        now -
+        lastPosition.time;
+
+
+    let pointSpeed = 0;
+
+
+    if (timeDiff > 0) {
+
+        pointSpeed =
+            meters /
+            (timeDiff / 1000);
+    }
+
+
+    /* GPS jump protection */
+
+    const unrealisticJump =
+        meters > 300
+        &&
+        pointSpeed > 55;
+
+
+    /* GPS noise protection */
+
+    const tinyNoise =
+        meters <
+        Math.max(
+            4,
+            accuracy * 0.35
+        );
+
+
+    /* Waiting မှာ distance မတက် */
+
+    if (
+        !isWaiting
+        &&
+        !unrealisticJump
+        &&
+        !tinyNoise
+    ) {
+
+        totalDistance +=
+            meters / 1000;
+    }
+
+
+    /* SPEED */
+
+    if (
+        typeof coords.speed === "number"
+        &&
+        coords.speed >= 0
+    ) {
+
+        currentSpeed =
+            Math.min(
+                150,
+                coords.speed * 3.6
+            );
+
+    } else if (
+        !unrealisticJump
+        &&
+        timeDiff > 0
+    ) {
+
+        currentSpeed =
+            Math.min(
+                150,
+                pointSpeed * 3.6
+            );
+
+    } else {
+
+        currentSpeed = 0;
+    }
+
+
+    /* Waiting ဖြစ်ရင် speed = 0 */
+
+    if (isWaiting) {
+
+        currentSpeed = 0;
+    }
+
+
+    /* Reference point update */
+
+    lastPosition = {
+        lat: lat,
+        lon: lon,
+        accuracy: accuracy,
+        time: now
+    };
+
+
+    updateUI();
 }
 
 
@@ -531,91 +716,151 @@ function handleGpsError(error) {
     );
 
 
-    showWarning(message);
+    if (isRunning) {
+
+        showWarning(message);
+    }
 }
 
 
 /* =========================
-   START
+   WARNING
    ========================= */
 
-async function startTrip() {
+function showWarning(
+    message,
+    autoHide = true
+) {
+
+    if (!warningBox) {
+        return;
+    }
+
+
+    warningText.textContent =
+        message;
+
+
+    warningBox.classList.remove(
+        "hidden"
+    );
+
+
+    clearTimeout(
+        warningTimer
+    );
+
+
+    if (
+        autoHide
+        &&
+        !(
+            isRunning
+            &&
+            isWaiting
+            &&
+            message.includes("စောင့်ဆိုင်း")
+        )
+    ) {
+
+        warningTimer =
+            setTimeout(
+                hideWarning,
+                4000
+            );
+    }
+}
+
+
+/* =========================
+   HIDE WARNING
+   ========================= */
+
+function hideWarning() {
+
+    if (!warningBox) {
+        return;
+    }
+
+    warningBox.classList.add(
+        "hidden"
+    );
+}
+
+
+/* =========================
+   GPS TIMEOUT CHECK
+   ========================= */
+
+function checkGpsTimeout() {
+
+    if (!isRunning) {
+        return;
+    }
+
+
+    if (!lastGpsTime) {
+        return;
+    }
+
+
+    const elapsed =
+        Date.now() -
+        lastGpsTime;
+
+
+    if (elapsed > 15000) {
+
+        showWarning(
+            "GPS အချက်အလက် အသစ်မရရှိသေးပါ။"
+        );
+    }
+}function startTrip() {
 
     if (isRunning) {
         stopTrip();
         return;
     }
 
-
-    /*
-     * User tap နဲ့ AudioContext
-     * စတင်ဖို့ကြိုးစားပါ။
-     */
-
     initAudio();
 
-
-    /*
-     * GPS permission / location
-     */
-
-    startGPS();
-
-
-    isRunning = true;
-
-    isWaiting = false;
-
     totalDistance = 0;
-
     totalWaitingMs = 0;
-
     currentSpeed = 0;
 
     startTime = Date.now();
-
     waitingStartTime = 0;
 
     lastPosition = null;
+    lastGpsTime = 0;
 
+    isWaiting = false;
+    isRunning = true;
+
+    startGPS();
 
     mainBtn.classList.add("stop");
-
     mainBtnIcon.textContent = "■";
-
     mainBtnText.textContent = "ရပ်တန့်";
 
     waitingBtn.classList.remove("active");
-
     waitingBtnIcon.textContent = "○";
-
-    waitingBtnText.textContent =
-        "စောင့်ဆိုင်းရန်";
-
+    waitingBtnText.textContent = "စောင့်ဆိုင်းရန်";
     waitingStatusText.textContent =
         "ခလုတ်နှိပ်၍ စတင်နိုင်ပါသည်";
 
-
     hideWarning();
 
+    clearInterval(timerId);
 
-    timerId =
-        setInterval(() => {
-
-            updateUI();
-
-            checkGpsTimeout();
-
-        }, 500);
-
+    timerId = setInterval(() => {
+        updateUI();
+        checkGpsTimeout();
+    }, 500);
 
     updateUI();
 }
 
-
-/* =========================
-   STOP
-   ========================= */
 
 function stopTrip() {
 
@@ -623,30 +868,31 @@ function stopTrip() {
         return;
     }
 
-
-    /*
-     * Waiting ဖြစ်နေရင် အရင်ပိတ်
-     */
-
     if (isWaiting) {
 
         totalWaitingMs +=
             Date.now() - waitingStartTime;
 
         isWaiting = false;
+        waitingStartTime = 0;
     }
-
 
     const finalWaiting =
         totalWaitingMs;
 
-
     const finalDuration =
         Date.now() - startTime;
 
+    const finalDistance =
+        totalDistance;
 
     const finalFare =
-        calculateFare();
+        settings.baseFare
+        +
+        finalDistance * settings.perKm
+        +
+        (finalWaiting / 60000)
+        * settings.perMinute;
 
 
     const record = {
@@ -657,7 +903,7 @@ function stopTrip() {
             new Date().toLocaleString(),
 
         distance:
-            totalDistance,
+            finalDistance,
 
         duration:
             finalDuration,
@@ -674,12 +920,13 @@ function stopTrip() {
 
 
     isRunning = false;
-
+    isWaiting = false;
     currentSpeed = 0;
 
     clearInterval(timerId);
-
     timerId = null;
+
+    stopWaitingReminder();
 
 
     if (watchId !== null) {
@@ -693,18 +940,12 @@ function stopTrip() {
 
 
     mainBtn.classList.remove("stop");
-
     mainBtnIcon.textContent = "▶";
-
     mainBtnText.textContent = "စတင်";
 
-
     waitingBtn.classList.remove("active");
-
     waitingBtnIcon.textContent = "○";
-
-    waitingBtnText.textContent =
-        "စောင့်ဆိုင်းရန်";
+    waitingBtnText.textContent = "စောင့်ဆိုင်းရန်";
 
     waitingStatusText.textContent =
         "ခလုတ်နှိပ်၍ စတင်နိုင်ပါသည်";
@@ -726,23 +967,13 @@ function stopTrip() {
     );
 
 
-    setTimeout(
-        hideWarning,
-        2500
-    );
+    setTimeout(() => {
+        hideWarning();
+    }, 2500);
 }
 
 
-/* =========================
-   WAITING TOGGLE
-   ========================= */
-
 function toggleWaiting() {
-
-    /*
-     * Trip မစရသေးရင်
-     * Waiting မလုပ်နိုင်ပါ။
-     */
 
     if (!isRunning) {
 
@@ -753,25 +984,17 @@ function toggleWaiting() {
         return;
     }
 
-
     initAudio();
 
 
     if (!isWaiting) {
-
-        /*
-         * Waiting START
-         */
 
         isWaiting = true;
 
         waitingStartTime =
             Date.now();
 
-
-        waitingBtn.classList.add(
-            "active"
-        );
+        waitingBtn.classList.add("active");
 
         waitingBtnIcon.textContent = "●";
 
@@ -781,119 +1004,92 @@ function toggleWaiting() {
         waitingStatusText.textContent =
             "စောင့်ဆိုင်းချိန် ဆက်လက်တွက်နေသည်";
 
-
-        /*
-         * မိနစ် ၁ ပြည့်ပြီးရင်
-         * အသံသတိပေးမှု စတင်ပါ။
-         */
+        currentSpeed = 0;
 
         startWaitingReminder();
 
-
-    } else {
-
-        /*
-         * Waiting STOP
-         */
-
-        totalWaitingMs +=
-            Date.now() - waitingStartTime;
-
-        waitingStartTime = 0;
-
-        isWaiting = false;
-
-
-        waitingBtn.classList.remove(
-            "active"
-        );
-
-        waitingBtnIcon.textContent = "○";
-
-        waitingBtnText.textContent =
-            "စောင့်ဆိုင်းရန်";
-
-        waitingStatusText.textContent =
-            "စောင့်ဆိုင်းချိန် ရပ်ထားသည်";
-
-
-        stopWaitingReminder();
-
         updateUI();
+
+        return;
     }
+
+
+    totalWaitingMs +=
+        Date.now() - waitingStartTime;
+
+    waitingStartTime = 0;
+    isWaiting = false;
+
+    waitingBtn.classList.remove("active");
+
+    waitingBtnIcon.textContent = "○";
+
+    waitingBtnText.textContent =
+        "စောင့်ဆိုင်းရန်";
+
+    waitingStatusText.textContent =
+        "စောင့်ဆိုင်းချိန် ရပ်ထားသည်";
+
+    stopWaitingReminder();
+
+    updateUI();
 }
 
 
-/* =========================
-   WAITING REMINDER
-   ========================= */
+let reminderTimer = null;
+
 
 function startWaitingReminder() {
 
     stopWaitingReminder();
 
 
-    warningTimer =
-        setTimeout(() => {
+    reminderTimer = setTimeout(() => {
 
-            if (
-                isRunning
-                &&
-                isWaiting
-            ) {
+        if (
+            isRunning &&
+            isWaiting
+        ) {
 
-                playReminder();
+            playReminder();
 
-                showWarning(
-                    "စောင့်ဆိုင်းချိန် ဖွင့်ထားဆဲဖြစ်ပါသည်။ မောင်းနေပြီဆိုရင် စောင့်ဆိုင်းမှုကို ပိတ်ပါ။"
-                );
+            showWarning(
+                "စောင့်ဆိုင်းချိန် ဖွင့်ထားဆဲဖြစ်ပါသည်။ မောင်းနေပြီဆိုရင် စောင့်ဆိုင်းမှုကို ပိတ်ပါ။"
+            );
 
 
-                /*
-                 * နောက်ထပ် 1 မိနစ်ကြာရင်
-                 * ထပ်သတိပေးပါမယ်။
-                 */
+            reminderTimer = setInterval(() => {
 
-                warningTimer =
-                    setInterval(() => {
+                if (
+                    isRunning &&
+                    isWaiting
+                ) {
 
-                        if (
-                            isRunning
-                            &&
-                            isWaiting
-                        ) {
+                    playReminder();
 
-                            playReminder();
+                    showWarning(
+                        "စောင့်ဆိုင်းချိန် ဖွင့်ထားဆဲဖြစ်ပါသည်။"
+                    );
+                }
 
-                            showWarning(
-                                "စောင့်ဆိုင်းချိန် ဖွင့်ထားဆဲဖြစ်ပါသည်။"
-                            );
+            }, 60000);
+        }
 
-                        }
-
-                    }, 60000);
-            }
-
-        }, 60000);
+    }, 60000);
 }
 
 
 function stopWaitingReminder() {
 
-    if (warningTimer !== null) {
+    if (reminderTimer !== null) {
 
-        clearTimeout(warningTimer);
+        clearTimeout(reminderTimer);
+        clearInterval(reminderTimer);
 
-        clearInterval(warningTimer);
-
-        warningTimer = null;
+        reminderTimer = null;
     }
 }
 
-
-/* =========================
-   AUDIO
-   ========================= */
 
 function initAudio() {
 
@@ -901,13 +1097,16 @@ function initAudio() {
 
         if (!audioContext) {
 
-            audioContext =
-                new (
-                    window.AudioContext
-                    ||
-                    window.webkitAudioContext
-                )();
+            const AudioCtx =
+                window.AudioContext ||
+                window.webkitAudioContext;
 
+            if (!AudioCtx) {
+                return;
+            }
+
+            audioContext =
+                new AudioCtx();
         }
 
 
@@ -919,11 +1118,11 @@ function initAudio() {
             audioContext.resume();
         }
 
-    } catch (e) {
+    } catch (error) {
 
         console.log(
-            "Audio unavailable",
-            e
+            "Audio unavailable:",
+            error
         );
     }
 }
@@ -936,7 +1135,6 @@ function playReminder() {
         if (!audioContext) {
             initAudio();
         }
-
 
         if (!audioContext) {
             return;
@@ -954,19 +1152,26 @@ function playReminder() {
 
         oscillator.frequency.value = 880;
 
+
+        const now =
+            audioContext.currentTime;
+
+
         gain.gain.setValueAtTime(
             0.001,
-            audioContext.currentTime
+            now
         );
+
 
         gain.gain.exponentialRampToValueAtTime(
             0.20,
-            audioContext.currentTime + 0.03
+            now + 0.05
         );
+
 
         gain.gain.exponentialRampToValueAtTime(
             0.001,
-            audioContext.currentTime + 0.6
+            now + 0.50
         );
 
 
@@ -977,237 +1182,17 @@ function playReminder() {
         );
 
 
-        oscillator.start();
+        oscillator.start(now);
 
         oscillator.stop(
-            audioContext.currentTime + 0.65
+            now + 0.55
         );
 
-    } catch (e) {
+    } catch (error) {
 
         console.log(
-            "Reminder sound unavailable",
-            e
+            "Reminder sound error:",
+            error
         );
     }
-}
-
-
-/* =========================
-   GPS TIMEOUT
-   ========================= */
-
-function checkGpsTimeout() {
-
-    if (!isRunning) {
-        return;
-    }
-
-
-    if (
-        lastGpsTime > 0
-        &&
-        Date.now() - lastGpsTime > 12000
-    ) {
-
-        setGpsStatus(
-            "error",
-            "GPS ပြတ်နေပါသည်",
-            "Location အချက်အလက် မရရှိသေးပါ"
-        );
-
-
-        showWarning(
-            "GPS ပြတ်နေသောကြောင့် ကီလိုမီတာတွက်ချက်မှု မတိကျနိုင်ပါ။"
-        );
-    }
-}
-
-
-/* =========================
-   WARNING
-   ========================= */
-
-function showWarning(message, autoHide = true) {
-
-    warningText.textContent =
-        message;
-
-    warningBox.classList.remove(
-        "hidden"
-    );
-
-
-    if (autoHide) {
-
-        setTimeout(
-            () => {
-
-                /*
-                 * Waiting reminder warning
-                 * ကို အလိုအလျောက် မဖျောက်ပါ။
-                 */
-
-                if (
-                    !(
-                        isRunning
-                        &&
-                        isWaiting
-                        &&
-                        message.includes(
-                            "စောင့်ဆိုင်း"
-                        )
-                    )
-                ) {
-
-                    hideWarning();
-                }
-
-            },
-            5000
-        );
-    }
-}
-
-
-function hideWarning() {
-
-    warningBox.classList.add(
-        "hidden"
-    );
-}
-
-
-/* =========================
-   HISTORY
-   ========================= */
-
-function getHistory() {
-
-    return JSON.parse(
-        localStorage.getItem(
-            "kiloOwayHistory"
-        )
-    ) || [];
-}
-
-
-function saveHistory(record) {
-
-    let history =
-        getHistory();
-
-
-    history.unshift(record);
-
-
-    /*
-     * နောက်ဆုံး 100 ခရီးပဲ သိမ်းထားမယ်။
-     */
-
-    history =
-        history.slice(0, 100);
-
-
-    localStorage.setItem(
-        "kiloOwayHistory",
-        JSON.stringify(history)
-    );
-}
-
-
-function renderHistory() {
-
-    const history =
-        getHistory();
-
-
-    historyList.innerHTML = "";
-
-
-    if (history.length === 0) {
-
-        historyList.innerHTML =
-            `
-            <div class="history-empty">
-                ခရီးမှတ်တမ်း မရှိသေးပါ။
-            </div>
-            `;
-
-        return;
-    }
-
-
-    history.forEach(record => {
-
-        const item =
-            document.createElement("div");
-
-        item.className =
-            "history-item";
-
-
-        item.innerHTML = `
-
-            <div class="history-date">
-                ${escapeHtml(record.date)}
-            </div>
-
-            <div class="history-grid">
-
-                <div class="history-cell">
-                    အကွာအဝေး
-                    <strong>
-                        ${Number(record.distance).toFixed(2)} km
-                    </strong>
-                </div>
-
-                <div class="history-cell">
-                    ကြာချိန်
-                    <strong>
-                        ${formatTime(record.duration)}
-                    </strong>
-                </div>
-
-                <div class="history-cell">
-                    စောင့်ဆိုင်းချိန်
-                    <strong>
-                        ${formatTime(record.waiting)}
-                    </strong>
-                </div>
-
-                <div class="history-cell">
-                    ကျသင့်ငွေ
-                    <strong>
-                        ${formatMoney(record.fare)} Ks
-                    </strong>
-                </div>
-
-            </div>
-        `;
-
-
-        historyList.appendChild(item);
-    });
-}
-
-
-function escapeHtml(text) {
-
-    return String(text)
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
-}
-
-
-/* =========================
-   SETTINGS
-   ========================= */
-
-function loadSettingsUI() {
-
-    $("baseFareInput").value =
-        sett
+               }
