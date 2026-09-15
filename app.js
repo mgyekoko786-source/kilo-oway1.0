@@ -608,64 +608,179 @@ function handlePosition(position) {
         !isWaiting
         &&
         !unrealisticJump
-        &&
-        !tinyNoise
-    ) {
+function handlePosition(position) {
 
-        totalDistance +=
-            meters / 1000;
+    if (!isRunning || isWaiting) {
+        return;
     }
 
+    const coords = position.coords;
 
-    /* SPEED */
+    const lat = Number(coords.latitude);
+    const lon = Number(coords.longitude);
+    const accuracy = Number(coords.accuracy);
 
     if (
-        typeof coords.speed === "number"
-        &&
-        coords.speed >= 0
+        !Number.isFinite(lat) ||
+        !Number.isFinite(lon) ||
+        !Number.isFinite(accuracy)
     ) {
-
-        currentSpeed =
-            Math.min(
-                150,
-                coords.speed * 3.6
-            );
-
-    } else if (
-        !unrealisticJump
-        &&
-        timeDiff > 0
-    ) {
-
-        currentSpeed =
-            Math.min(
-                150,
-                pointSpeed * 3.6
-            );
-
-    } else {
-
-        currentSpeed = 0;
+        return;
     }
 
-
-    /* Waiting ဖြစ်ရင် speed = 0 */
-
-    if (isWaiting) {
-
-        currentSpeed = 0;
+    /* GPS accuracy မကောင်းရင် မတွက် */
+    if (accuracy > 25) {
+        setGpsStatus(
+            "weak",
+            "GPS အချက်အလက် မတိကျသေးပါ",
+            "Accuracy ±" + Math.round(accuracy) + " m"
+        );
+        return;
     }
 
-
-    /* Reference point update */
-
-    lastPosition = {
+    const newPoint = {
         lat: lat,
         lon: lon,
         accuracy: accuracy,
-        time: now
+        time: Date.now(),
+        speed:
+            Number.isFinite(coords.speed) &&
+            coords.speed >= 0
+                ? coords.speed
+                : 0
     };
 
+    /* ပထမဆုံး GPS point */
+    if (!lastPosition) {
+
+        lastPosition = newPoint;
+        lastGpsTime = newPoint.time;
+
+        currentSpeed =
+            newPoint.speed * 3.6;
+
+        setGpsStatus(
+            "connected",
+            "GPS ချိတ်ဆက်ပြီး",
+            "Accuracy ±" +
+            Math.round(accuracy) +
+            " m"
+        );
+
+        updateUI();
+
+        return;
+    }
+
+    const elapsed =
+        (newPoint.time - lastPosition.time) / 1000;
+
+    if (
+        elapsed <= 0 ||
+        elapsed > 30
+    ) {
+        lastPosition = newPoint;
+        lastGpsTime = newPoint.time;
+        return;
+    }
+
+    const distanceMeters =
+        haversineDistance(
+            lastPosition.lat,
+            lastPosition.lon,
+            newPoint.lat,
+            newPoint.lon
+        );
+
+    /*
+       GPS Jitter Filter
+
+       ဖုန်းငြိမ်နေချိန်မှာ
+       0–8m လောက် လှုပ်တာကို
+       လုံးဝ KM မပေါင်း
+    */
+    if (distanceMeters < 8) {
+
+        currentSpeed = 0;
+
+        setGpsStatus(
+            "connected",
+            "GPS ချိတ်ဆက်ပြီး",
+            "Accuracy ±" +
+            Math.round(accuracy) +
+            " m"
+        );
+
+        updateUI();
+
+        return;
+    }
+
+    /*
+       GPS က တစ်ချက်တည်းနဲ့
+       မဖြစ်နိုင်လောက်အောင် ခုန်သွားရင် reject
+    */
+
+    const calculatedSpeed =
+        (distanceMeters / elapsed) * 3.6;
+
+    if (calculatedSpeed > 120) {
+
+        return;
+    }
+
+    /*
+       GPS reported speed ရှိရင်
+       အဲဒါကိုပါ စစ်
+    */
+
+    const gpsSpeed =
+        newPoint.speed * 3.6;
+
+    /*
+       ဖုန်းငြိမ်နေချိန် GPS က
+       ရုတ်တရက် 8–20m လောက် ခုန်ရင်
+       မတွက်
+    */
+
+    if (
+        gpsSpeed < 2 &&
+        calculatedSpeed < 12
+    ) {
+
+        lastPosition = newPoint;
+        lastGpsTime = newPoint.time;
+
+        currentSpeed = 0;
+
+        updateUI();
+
+        return;
+    }
+
+    /*
+       အမှန်တကယ် ရွေ့လျားနေတယ်လို့
+       သတ်မှတ်ပြီးမှ KM ပေါင်း
+    */
+
+    totalDistance +=
+        distanceMeters / 1000;
+
+    currentSpeed =
+        gpsSpeed > 0
+            ? gpsSpeed
+            : calculatedSpeed;
+
+    lastPosition = newPoint;
+    lastGpsTime = newPoint.time;
+
+    setGpsStatus(
+        "connected",
+        "GPS ချိတ်ဆက်ပြီး",
+        "Accuracy ±" +
+        Math.round(accuracy) +
+        " m"
+    );
 
     updateUI();
 }
