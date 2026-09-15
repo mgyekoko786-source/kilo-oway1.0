@@ -1196,3 +1196,557 @@ function playReminder() {
         );
     }
                }
+function saveHistory(record) {
+
+    try {
+
+        const saved =
+            localStorage.getItem("kiloOwayHistory");
+
+        let history = saved
+            ? JSON.parse(saved)
+            : [];
+
+        if (!Array.isArray(history)) {
+            history = [];
+        }
+
+        history.unshift(record);
+
+        history =
+            history.slice(0, 100);
+
+        localStorage.setItem(
+            "kiloOwayHistory",
+            JSON.stringify(history)
+        );
+
+    } catch (error) {
+
+        console.log(
+            "History save error:",
+            error
+        );
+    }
+}
+
+
+function loadHistory() {
+
+    try {
+
+        const saved =
+            localStorage.getItem("kiloOwayHistory");
+
+        if (!saved) {
+            return [];
+        }
+
+        const history =
+            JSON.parse(saved);
+
+        return Array.isArray(history)
+            ? history
+            : [];
+
+    } catch (error) {
+
+        console.log(
+            "History load error:",
+            error
+        );
+
+        return [];
+    }
+}
+
+
+function renderHistory() {
+
+    if (!historyList) {
+        return;
+    }
+
+    const history =
+        loadHistory();
+
+
+    if (history.length === 0) {
+
+        historyList.innerHTML = `
+            <div class="empty-history">
+                ခရီးမှတ်တမ်း မရှိသေးပါ။
+            </div>
+        `;
+
+        return;
+    }
+
+
+    historyList.innerHTML =
+        history.map(item => {
+
+            return `
+                <div class="history-item">
+
+                    <div class="history-top">
+                        <span>${item.date}</span>
+                        <strong>
+                            ${formatMoney(item.fare)} Ks
+                        </strong>
+                    </div>
+
+                    <div class="history-details">
+
+                        <span>
+                            📍 ${Number(item.distance).toFixed(2)} km
+                        </span>
+
+                        <span>
+                            ◷ ${formatTime(item.duration)}
+                        </span>
+
+                        <span>
+                            ⏱ ${formatTime(item.waiting)}
+                        </span>
+
+                    </div>
+
+                </div>
+            `;
+
+        }).join("");
+}
+
+
+function openHistory() {
+
+    renderHistory();
+
+    historyModal.classList.remove(
+        "hidden"
+    );
+}
+
+
+function closeHistoryModal() {
+
+    historyModal.classList.add(
+        "hidden"
+    );
+}
+
+
+function loadSettingsUI() {
+
+    const baseInput =
+        $("baseFareInput");
+
+    const kmInput =
+        $("perKmInput");
+
+    const minuteInput =
+        $("perMinuteInput");
+
+
+    if (baseInput) {
+
+        baseInput.value =
+            settings.baseFare;
+    }
+
+
+    if (kmInput) {
+
+        kmInput.value =
+            settings.perKm;
+    }
+
+
+    if (minuteInput) {
+
+        minuteInput.value =
+            settings.perMinute;
+    }
+}
+
+
+function saveSettings() {
+
+    const baseInput =
+        $("baseFareInput");
+
+    const kmInput =
+        $("perKmInput");
+
+    const minuteInput =
+        $("perMinuteInput");
+
+
+    const base =
+        Number(baseInput.value);
+
+    const km =
+        Number(kmInput.value);
+
+    const minute =
+        Number(minuteInput.value);
+
+
+    if (
+        !Number.isFinite(base) ||
+        base < 0
+    ) {
+
+        alert(
+            "အခြေခံဈေးနှုန်း မှန်ကန်စွာထည့်ပါ။"
+        );
+
+        return;
+    }
+
+
+    if (
+        !Number.isFinite(km) ||
+        km < 0
+    ) {
+
+        alert(
+            "1 Kilometer ဈေးနှုန်း မှန်ကန်စွာထည့်ပါ။"
+        );
+
+        return;
+    }
+
+
+    if (
+        !Number.isFinite(minute) ||
+        minute < 0
+    ) {
+
+        alert(
+            "စောင့်ဆိုင်းဈေးနှုန်း မှန်ကန်စွာထည့်ပါ။"
+        );
+
+        return;
+    }
+
+
+    settings = {
+
+        baseFare:
+            Math.round(base),
+
+        perKm:
+            Math.round(km),
+
+        perMinute:
+            Math.round(minute)
+    };
+
+
+    localStorage.setItem(
+        "kiloOwaySettings",
+        JSON.stringify(settings)
+    );
+
+
+    loadSettingsUI();
+
+    updateUI();
+
+    settingsModal.classList.add(
+        "hidden"
+    );
+
+
+    showWarning(
+        "ဈေးနှုန်းဆက်တင်များ သိမ်းပြီးပါပြီ။"
+    );
+}
+
+
+function resetSettings() {
+
+    const ok =
+        confirm(
+            "မူလဈေးနှုန်း 3,000 / 1,000 / 150 Ks သို့ ပြန်ထားမလား?"
+        );
+
+
+    if (!ok) {
+        return;
+    }
+
+
+    settings = {
+        ...DEFAULT_SETTINGS
+    };
+
+
+    localStorage.setItem(
+        "kiloOwaySettings",
+        JSON.stringify(settings)
+    );
+
+
+    loadSettingsUI();
+
+    updateUI();
+
+
+    showWarning(
+        "မူလဈေးနှုန်းသို့ ပြန်ထားပြီးပါပြီ။"
+    );
+}
+
+
+function openSettings() {
+
+    loadSettingsUI();
+
+    settingsModal.classList.remove(
+        "hidden"
+    );
+}
+
+
+function closeSettingsModal() {
+
+    settingsModal.classList.add(
+        "hidden"
+    );
+}
+
+
+/* =========================
+   BUTTON EVENTS
+   ========================= */
+
+if (mainBtn) {
+
+    mainBtn.addEventListener(
+        "click",
+        startTrip
+    );
+}
+
+
+if (waitingBtn) {
+
+    waitingBtn.addEventListener(
+        "click",
+        toggleWaiting
+    );
+}
+
+
+/* =========================
+   HISTORY BUTTONS
+   ========================= */
+
+const historyBtn =
+    $("historyBtn");
+
+const historyNav =
+    $("historyNav");
+
+const closeHistory =
+    $("closeHistory");
+
+
+if (historyBtn) {
+
+    historyBtn.addEventListener(
+        "click",
+        openHistory
+    );
+}
+
+
+if (historyNav) {
+
+    historyNav.addEventListener(
+        "click",
+        openHistory
+    );
+}
+
+
+if (closeHistory) {
+
+    closeHistory.addEventListener(
+        "click",
+        closeHistoryModal
+    );
+}
+
+
+if (historyModal) {
+
+    historyModal.addEventListener(
+        "click",
+        event => {
+
+            if (
+                event.target ===
+                historyModal
+            ) {
+
+                closeHistoryModal();
+            }
+        }
+    );
+}
+
+
+/* =========================
+   SETTINGS BUTTONS
+   ========================= */
+
+const settingsBtn =
+    $("settingsBtn");
+
+const settingsNav =
+    $("settingsNav");
+
+const closeSettings =
+    $("closeSettings");
+
+const saveSettingsBtn =
+    $("saveSettings");
+
+const resetSettingsBtn =
+    $("resetSettings");
+
+
+if (settingsBtn) {
+
+    settingsBtn.addEventListener(
+        "click",
+        openSettings
+    );
+}
+
+
+if (settingsNav) {
+
+    settingsNav.addEventListener(
+        "click",
+        openSettings
+    );
+}
+
+
+if (closeSettings) {
+
+    closeSettings.addEventListener(
+        "click",
+        closeSettingsModal
+    );
+}
+
+
+if (saveSettingsBtn) {
+
+    saveSettingsBtn.addEventListener(
+        "click",
+        saveSettings
+    );
+}
+
+
+if (resetSettingsBtn) {
+
+    resetSettingsBtn.addEventListener(
+        "click",
+        resetSettings
+    );
+}
+
+
+if (settingsModal) {
+
+    settingsModal.addEventListener(
+        "click",
+        event => {
+
+            if (
+                event.target ===
+                settingsModal
+            ) {
+
+                closeSettingsModal();
+            }
+        }
+    );
+}
+
+
+/* =========================
+   WARNING CLOSE
+   ========================= */
+
+const closeWarning =
+    $("closeWarning");
+
+
+if (closeWarning) {
+
+    closeWarning.addEventListener(
+        "click",
+        hideWarning
+    );
+}
+
+
+/* =========================
+   HOME NAV
+   ========================= */
+
+const homeNav =
+    $("homeNav");
+
+
+if (homeNav) {
+
+    homeNav.addEventListener(
+        "click",
+        () => {
+
+            historyModal.classList.add(
+                "hidden"
+            );
+
+            settingsModal.classList.add(
+                "hidden"
+            );
+        }
+    );
+}
+
+
+/* =========================
+   INITIALIZE
+   ========================= */
+
+function initializeApp() {
+
+    loadSettingsUI();
+
+    updateUI();
+
+    hideWarning();
+
+    setGpsStatus(
+        "waiting",
+        "GPS အသင့်",
+        "ခရီးစဉ်စတင်ရန် စောင့်နေပါသည်"
+    );
+}
+
+
+document.addEventListener(
+    "DOMContentLoaded",
+    initializeApp
+);
