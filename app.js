@@ -256,28 +256,7 @@ function calculateFare() {
     const waitingMs =
         getCurrentWaitingMs();
 
-    const waitingUnits =
-        Math.floor(
-            waitingMs / 10000
-        );
-
-    const waitingFare =
-        Math.round(
-            waitingUnits *
-            settings.perMinute /
-            6
-        );
-
-    const distanceFare =
-        totalDistance *
-        settings.perKm;
-
-    const fare =
-        settings.baseFare
-        +
-        distanceFare
-        +
-        waitingFare;
+    const finalFare = calculateFare();
 
     return Math.max(
         settings.baseFare,
