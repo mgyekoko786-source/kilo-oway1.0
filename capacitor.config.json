@@ -1,6 +1,6 @@
 {
   "appId": "com.kilooway.taxi",
   "appName": "Kilo Oway",
-  "webDir": ".",
+  "webDir": "www",
   "bundledWebRuntime": false
 }
