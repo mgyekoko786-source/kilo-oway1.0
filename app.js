@@ -252,7 +252,6 @@ function getCurrentWaitingMs() {
    ========================= */
 
 function calculateFare() {
-function calculateFare() {
 
     const waitingMs =
         getCurrentWaitingMs();
