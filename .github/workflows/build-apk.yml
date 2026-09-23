@@ -1,9 +1,9 @@
 name: Build Kilo Oway APK
 
 on:
-  workflow_dispatch:
   push:
-    branches: [ "main" ]
+    branches: [main]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -17,9 +17,44 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
 
       - name: Install dependencies
         run: npm install
+
+      - name: Prepare web assets
+        shell: bash
+        run: |
+          set -e
+          rm -rf www
+          mkdir -p www
+
+          test -f index.html
+          test -f style.css
+          test -f app.js
+
+          cp index.html www/index.html
+          cp style.css www/style.css
+          cp app.js www/app.js
+
+          if [ -d assets ]; then
+            cp -r assets www/assets
+          fi
+
+          echo "Web assets prepared:"
+          find www -maxdepth 2 -type f -print
+
+      - name: Ensure Capacitor config
+        shell: bash
+        run: |
+          cat > capacitor.config.json <<'EOF'
+          {
+            "appId": "com.kilooway.app",
+            "appName": "Kilo Oway",
+            "webDir": "www",
+            "bundledWebRuntime": false
+          }
+          EOF
 
       - name: Add Android
         run: npx cap add android
@@ -27,76 +62,30 @@ jobs:
       - name: Configure Android Location Permission
         shell: bash
         run: |
-          set -e
-
-          MANIFEST="android/app/src/main/AndroidManifest.xml"
-
-          # Add Android location permissions before <application>.
           python3 - <<'PY'
           from pathlib import Path
+
           p = Path("android/app/src/main/AndroidManifest.xml")
           s = p.read_text()
-          perms = [
-              '    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />',
-              '    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />',
+
+          permissions = [
+              '<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />',
+              '<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />'
           ]
-          missing = [x for x in perms if x not in s]
-          if missing:
-              marker = "    <application"
-              s = s.replace(marker, "\n".join(missing) + "\n\n" + marker, 1)
+
+          for perm in permissions:
+              if perm not in s:
+                  s = s.replace(
+                      '<manifest ',
+                      '<manifest ',
+                      1
+                  )
+                  marker = '>'
+                  pos = s.find(marker)
+                  s = s[:pos+1] + '\n    ' + perm + s[pos+1:]
+
           p.write_text(s)
           PY
-
-          # Replace the generated MainActivity with one that requests
-          # Android Location permission at runtime.
-          MAIN=$(find android/app/src/main/java -name MainActivity.java | head -n 1)
-
-          if [ -z "$MAIN" ]; then
-            echo "MainActivity.java not found"
-            exit 1
-          fi
-
-          PACKAGE=$(grep '^package ' "$MAIN" | sed 's/package //; s/;//')
-
-          cat > "$MAIN" <<JAVA
-          package $PACKAGE;
-
-          import android.Manifest;
-          import android.content.pm.PackageManager;
-          import android.os.Bundle;
-
-          import com.getcapacitor.BridgeActivity;
-
-          public class MainActivity extends BridgeActivity {
-              @Override
-              public void onCreate(Bundle savedInstanceState) {
-                  super.onCreate(savedInstanceState);
-
-                  if (android.os.Build.VERSION.SDK_INT >= 23) {
-                      boolean fine =
-                          checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)
-                          == PackageManager.PERMISSION_GRANTED;
-
-                      boolean coarse =
-                          checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
-                          == PackageManager.PERMISSION_GRANTED;
-
-                      if (!fine && !coarse) {
-                          requestPermissions(
-                              new String[] {
-                                  Manifest.permission.ACCESS_FINE_LOCATION,
-                                  Manifest.permission.ACCESS_COARSE_LOCATION
-                              },
-                              1001
-                          );
-                      }
-                  }
-              }
-          }
-          JAVA
-
-          echo "Location permissions configured."
-          echo "MainActivity: $MAIN"
 
       - name: Sync Android
         run: npx cap sync android
@@ -105,14 +94,15 @@ jobs:
         uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: 21
+          java-version: '21'
 
       - name: Build Debug APK
         working-directory: android
-        run: ./gradlew assembleDebug --no-daemon
+        run: ./gradlew assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Kilo-Oway-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
