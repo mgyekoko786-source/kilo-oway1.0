@@ -1,0 +1,92 @@
+name: Build Kilo Oway APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Prepare web assets
+        shell: bash
+        run: |
+          set -e
+          rm -rf www
+          mkdir -p www
+          test -f index.html
+          test -f style.css
+          test -f app.js
+          cp index.html www/index.html
+          cp style.css www/style.css
+          cp app.js www/app.js
+          if [ -d assets ]; then cp -r assets www/assets; fi
+
+      - name: Ensure Capacitor config
+        shell: bash
+        run: |
+          cat > capacitor.config.json <<'EOF'
+          {
+            "appId": "com.kilooway.app",
+            "appName": "Kilo Oway",
+            "webDir": "www",
+            "bundledWebRuntime": false
+          }
+          EOF
+
+      - name: Add Android
+        run: npx cap add android
+
+      - name: Add location permissions
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("android/app/src/main/AndroidManifest.xml")
+          s = p.read_text()
+          perms = [
+              '<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />',
+              '<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />'
+          ]
+          pos = s.find(">")
+          if pos < 0:
+              raise SystemExit("Invalid AndroidManifest.xml")
+          head, tail = s[:pos+1], s[pos+1:]
+          for perm in perms:
+              if perm not in s:
+                  head += "\n    " + perm
+          p.write_text(head + tail)
+          PY
+
+      - name: Sync Android
+        run: npx cap sync android
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Build Debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kilo-Oway-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
