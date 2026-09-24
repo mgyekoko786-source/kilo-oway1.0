@@ -50,7 +50,7 @@ jobs:
       - name: Add Android
         run: npx cap add android
 
-              - name: Add location permissions
+      - name: Add location permissions
           shell: bash
           run: |
             python3 - <<'PY'
@@ -78,7 +78,7 @@ jobs:
             p.write_text(s)
             PY
 
-        - name: Validate AndroidManifest
+      - name: Validate AndroidManifest
           run: |
             python3 - <<'PY'
             import xml.etree.ElementTree as ET
