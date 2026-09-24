@@ -51,40 +51,43 @@ jobs:
         run: npx cap add android
 
       - name: Add location permissions
-          shell: bash
-          run: |
-            python3 - <<'PY'
-            from pathlib import Path
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
 
-            p = Path("android/app/src/main/AndroidManifest.xml")
-            s = p.read_text()
+          p = Path("android/app/src/main/AndroidManifest.xml")
+          s = p.read_text()
 
-            marker = "<application"
+          marker = "<application"
 
-            permissions = (
-                '    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n'
-                '    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n'
-            )
+          permissions = (
+              '    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n'
+              '    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n'
+          )
 
-            if "android.permission.ACCESS_FINE_LOCATION" not in s:
-                s = s.replace(marker, permissions + marker, 1)
-            elif "android.permission.ACCESS_COARSE_LOCATION" not in s:
-                s = s.replace(
-                    marker,
-                    '    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n' + marker,
-                    1
-                )
+          if "android.permission.ACCESS_FINE_LOCATION" not in s:
+              s = s.replace(marker, permissions + marker, 1)
+          elif "android.permission.ACCESS_COARSE_LOCATION" not in s:
+              s = s.replace(
+                  marker,
+                  '    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n'
+                  + marker,
+                  1
+              )
 
-            p.write_text(s)
-            PY
+          p.write_text(s)
+          PY
 
       - name: Validate AndroidManifest
-          run: |
-            python3 - <<'PY'
-            import xml.etree.ElementTree as ET
-            ET.parse("android/app/src/main/AndroidManifest.xml")
-            print("AndroidManifest.xml is valid XML")
-            PY
+        run: |
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+
+          ET.parse("android/app/src/main/AndroidManifest.xml")
+          print("AndroidManifest.xml is valid XML")
+          PY
+
       - name: Sync Android
         run: npx cap sync android
 
