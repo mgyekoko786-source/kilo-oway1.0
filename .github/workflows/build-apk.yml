@@ -33,7 +33,9 @@ jobs:
           cp index.html www/index.html
           cp style.css www/style.css
           cp app.js www/app.js
-          if [ -d assets ]; then cp -r assets www/assets; fi
+          if [ -d assets ]; then
+            cp -r assets www/assets
+          fi
 
       - name: Ensure Capacitor config
         shell: bash
@@ -50,7 +52,13 @@ jobs:
       - name: Add Android
         run: npx cap add android
 
-      - name: Add location permissions
+      - name: Install Capacitor Assets
+        run: npm install --save-dev @capacitor/assets
+
+      - name: Generate Android App Icon
+        run: npx capacitor-assets generate --android
+
+      - name: Add Android location permissions
         shell: bash
         run: |
           python3 - <<'PY'
@@ -71,8 +79,7 @@ jobs:
           elif "android.permission.ACCESS_COARSE_LOCATION" not in s:
               s = s.replace(
                   marker,
-                  '    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n'
-                  + marker,
+                  '    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n' + marker,
                   1
               )
 
@@ -83,7 +90,6 @@ jobs:
         run: |
           python3 - <<'PY'
           import xml.etree.ElementTree as ET
-
           ET.parse("android/app/src/main/AndroidManifest.xml")
           print("AndroidManifest.xml is valid XML")
           PY
