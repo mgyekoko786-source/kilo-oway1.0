@@ -12,3 +12,10 @@
 .bottom-nav {
     display: none !important;
 }
+.app-logo {
+    width: 58px;
+    height: 58px;
+    object-fit: contain;
+    display: block;
+    flex-shrink: 0;
+}
